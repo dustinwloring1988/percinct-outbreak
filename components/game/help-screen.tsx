@@ -12,8 +12,6 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
     { key: "Right Click", action: "Knife Attack" },
     { key: "R", action: "Reload" },
     { key: "Space + Direction", action: "Combat Roll" },
-    { key: "C", action: "Crouch" },
-    { key: "Z", action: "Prone" },
     { key: "Q", action: "Swap Weapon" },
     { key: "1 / 2", action: "Select Weapon Slot" },
     { key: "G", action: "Throw Grenade" },

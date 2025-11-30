@@ -12,11 +12,13 @@ import type {
   Door,
   ZombieType,
   SpawnPoint,
+  Weapon as WeaponType,
 } from "./types"
 import { WEAPONS, THROWABLES, ZOMBIE_STATS, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE } from "./constants"
 import { generateId, vectorAdd, vectorNormalize, vectorScale, vectorDistance } from "./utils"
 import { generateMap } from "./map-generator"
 import { audioManager } from "./audio-manager"
+import { statsDB, GameStats } from "./stats-db"
 
 // Constants that were previously undeclared
 const SPAWN_INTERVAL_BASE = 2000
@@ -27,8 +29,6 @@ const PLAYER_SPEED = 200
 const PLAYER_ROLL_DURATION = 500
 const PLAYER_ROLL_COOLDOWN = 1500
 const PLAYER_ROLL_SPEED = 600
-const PLAYER_CROUCH_SPEED = 100
-const PLAYER_PRONE_SPEED = 50
 const PLAYER_KNIFE_COOLDOWN = 500
 const PLAYER_KNIFE_RANGE = 50
 const PLAYER_KNIFE_DAMAGE = 25
@@ -51,8 +51,24 @@ export class GameEngine {
   private lastSpawnTime = 0
   private spawnInterval = SPAWN_INTERVAL_BASE
   private accessibleSpawnPoints: SpawnPoint[] = []
+  private stats: GameStats | null = null
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
+  private lastStatsSaveTime = 0;
+
+  public get initialized() {
+    return this.isInitialized;
+  }
 
   constructor() {
+    // Initialize database first, but don't wait in constructor
+    this.initPromise = this.initialize();
+  }
+
+  private async initialize() {
+    // Wait for database initialization first
+    await statsDB.init();
+
     this.map = generateMap()
     this.input = {
       keys: new Set(),
@@ -62,6 +78,37 @@ export class GameEngine {
     }
     this.state = this.createInitialState()
     this.updateAccessibleSpawnPoints()
+
+    // Initialize stats from database
+    try {
+      this.stats = await statsDB.getStats();
+    } catch (error) {
+      console.error('Failed to load stats from database, using default:', error);
+      // Use default stats if database fails
+      this.stats = {
+        totalTimePlayed: 0,
+        totalKills: 0,
+        killsByWeapon: Object.fromEntries(
+          WEAPONS.map(weapon => [weapon.id, 0])
+        ),
+        doorsOpened: 0,
+        vendingMachinesUsed: 0,
+        totalRounds: 0,
+        totalMoneyEarned: 0,
+        totalMoneySpent: 0,
+        mysteryBoxesOpened: 0,
+        powerUpsCollected: 0,
+      };
+    }
+
+    this.isInitialized = true;
+  }
+
+  public async waitForInitialization() {
+    if (this.initPromise) {
+      await this.initPromise;
+      this.initPromise = null;
+    }
   }
 
   private createInitialState(): GameState {
@@ -119,7 +166,10 @@ export class GameEngine {
     this.viewportHeight = height
   }
 
-  reset() {
+  async reset() {
+    // Save current stats before resetting
+    await this.saveStats();
+
     this.map = generateMap()
     this.state = this.createInitialState()
     this.explosions = []
@@ -131,6 +181,20 @@ export class GameEngine {
     if (this.state.isPaused || this.state.isGameOver) return
 
     const dt = deltaTime / 1000 // Convert to seconds
+
+    // Track play time if the game is running
+    if (this.stats) {
+      this.stats.totalTimePlayed += dt;
+
+      // Save stats periodically (every 10 seconds) to track play time
+      const now = Date.now();
+      if (now - this.lastStatsSaveTime > 10000) {  // 10 seconds
+        this.lastStatsSaveTime = now;
+        statsDB.saveStats(this.stats).catch(err => {
+          console.error('Failed to save stats periodically:', err);
+        });
+      }
+    }
 
     this.updatePlayer(dt)
     this.updateBullets(dt)
@@ -178,14 +242,6 @@ export class GameEngine {
     if (keys.has("KeyD") || keys.has("ArrowRight")) moveX += 1
 
     // Stance changes
-    if (keys.has("KeyC")) {
-      player.state = player.state === "crouching" ? "standing" : "crouching"
-      keys.delete("KeyC")
-    }
-    if (keys.has("KeyZ")) {
-      player.state = player.state === "prone" ? "standing" : "prone"
-      keys.delete("KeyZ")
-    }
 
     // Roll initiation
     if (keys.has("Space") && player.rollCooldown <= 0 && (moveX !== 0 || moveY !== 0)) {
@@ -199,8 +255,6 @@ export class GameEngine {
 
     // Calculate speed based on stance and perks
     let speed = PLAYER_SPEED
-    if (player.state === "crouching") speed = PLAYER_CROUCH_SPEED
-    if (player.state === "prone") speed = PLAYER_PRONE_SPEED
     if (this.state.activePerks.includes("speed-boost")) speed *= 1.3
     if (this.state.activePowerUps.some((p) => p.type === "speed-boost")) speed *= 1.5
 
@@ -605,6 +659,24 @@ export class GameEngine {
       points *= 2
     }
 
+    // Track stats
+    if (this.stats) {
+      this.stats.totalKills += 1;
+      this.stats.totalMoneyEarned += Math.floor(points / 10);
+
+      // Get the weapon used to kill the zombie
+      // We'll assume the current weapon for now since tracking exact weapon would require more changes
+      const currentWeaponId = this.state.player.weapons[this.state.player.currentWeaponIndex]?.id;
+      if (currentWeaponId) {
+        this.stats.killsByWeapon[currentWeaponId] = (this.stats.killsByWeapon[currentWeaponId] || 0) + 1;
+      }
+
+      // Save stats to database immediately
+      statsDB.saveStats(this.stats).catch(err => {
+        console.error('Failed to save stats after kill:', err);
+      });
+    }
+
     this.state.score += points
     this.state.player.money += Math.floor(points / 10)
 
@@ -677,6 +749,16 @@ export class GameEngine {
         type,
         endTime: Date.now() + duration,
       })
+    }
+
+    // Track stats
+    if (this.stats) {
+      this.stats.powerUpsCollected += 1;
+
+      // Save stats to database immediately
+      statsDB.saveStats(this.stats).catch(err => {
+        console.error('Failed to save stats after power-up collection:', err);
+      });
     }
   }
 
@@ -930,6 +1012,17 @@ export class GameEngine {
     vm.purchased = true
     this.state.activePerks.push(vm.perk.effect)
     audioManager.play("vending")
+
+    // Track stats
+    if (this.stats) {
+      this.stats.vendingMachinesUsed += 1;
+      this.stats.totalMoneySpent += vm.price;
+
+      // Save stats to database immediately
+      statsDB.saveStats(this.stats).catch(err => {
+        console.error('Failed to save stats after vending machine purchase:', err);
+      });
+    }
   }
 
   switchWeapon(index: number) {
@@ -966,6 +1059,17 @@ export class GameEngine {
       }
       // Update accessible spawn points since a new area is now accessible
       this.updateAccessibleSpawnPoints();
+
+      // Track stats
+      if (this.stats) {
+        this.stats.doorsOpened += 1;
+        this.stats.totalMoneySpent += door.price;
+
+        // Save stats to database immediately
+        statsDB.saveStats(this.stats).catch(err => {
+          console.error('Failed to save stats after door purchase:', err);
+        });
+      }
       return
     }
 
@@ -1032,6 +1136,17 @@ export class GameEngine {
           // Pick a random weapon (can be any weapon, including upgraded versions)
           const allWeapons = [...WEAPONS]
           mysteryBox.currentWeapon = { ...allWeapons[Math.floor(Math.random() * allWeapons.length)] }
+
+          // Track stats
+          if (this.stats) {
+            this.stats.mysteryBoxesOpened += 1;
+            this.stats.totalMoneySpent += mysteryBox.price;
+
+            // Save stats to database immediately
+            statsDB.saveStats(this.stats).catch(err => {
+              console.error('Failed to save stats after mystery box purchase:', err);
+            });
+          }
         }
       }
     }
@@ -1103,6 +1218,17 @@ export class GameEngine {
     vm.purchased = true
     this.state.activePerks.push(vm.perk.effect)
     audioManager.play("vending")
+
+    // Track stats
+    if (this.stats) {
+      this.stats.vendingMachinesUsed += 1;
+      this.stats.totalMoneySpent += vm.price;
+
+      // Save stats to database immediately
+      statsDB.saveStats(this.stats).catch(err => {
+        console.error('Failed to save stats after vending machine purchase:', err);
+      });
+    }
   }
 
   switchWeapon(index: number) {
@@ -1114,5 +1240,24 @@ export class GameEngine {
 
   givePlayerMoney(amount: number) {
     this.state.player.money += amount;
+
+    // Track stats
+    if (this.stats) {
+      this.stats.totalMoneyEarned += amount;
+
+      // Save stats to database immediately
+      statsDB.saveStats(this.stats).catch(err => {
+        console.error('Failed to save stats after money received:', err);
+      });
+    }
+  }
+
+  async saveStats() {
+    if (this.stats) {
+      this.stats.totalRounds += 1;
+      await statsDB.saveStats(this.stats);
+      // Reset the periodic save time so we don't double-save
+      this.lastStatsSaveTime = Date.now();
+    }
   }
 }

@@ -43,7 +43,7 @@ export interface Player extends Entity {
   knifeCooldown: number
 }
 
-export type PlayerState = "standing" | "crouching" | "prone" | "rolling"
+export type PlayerState = "standing" | "rolling"
 
 export interface Weapon {
   id: string

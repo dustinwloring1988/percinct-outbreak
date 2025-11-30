@@ -167,7 +167,7 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
       const renderer = rendererRef.current
       const canvas = canvasRef.current
 
-      if (engine && renderer && canvas) {
+      if (engine && renderer && canvas && engine.initialized) {
         engine.update(deltaTime)
         renderer.render(deltaTime)
         syncGameState()
@@ -196,19 +196,28 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     resizeCanvas()
     window.addEventListener("resize", resizeCanvas)
 
-    // Initialize engine and renderer
+    // Initialize engine
     const engine = new GameEngine()
-    engine.setViewport(canvas.width, canvas.height)
     engineRef.current = engine
 
+    // Initialize renderer immediately with the engine
     const renderer = new GameRenderer(ctx, engine)
     rendererRef.current = renderer
 
+    // Initialize audio
     audioManager.init()
     audioManager.playBackground()
 
-    // Start game loop
-    animationFrameRef.current = requestAnimationFrame(gameLoop)
+    // Wait for engine to be fully initialized before starting the game loop
+    engine.waitForInitialization().then(() => {
+      if (engineRef.current) {
+        // Set viewport after initialization
+        engineRef.current.setViewport(canvas.width, canvas.height)
+
+        // Start game loop only after initialization is complete
+        animationFrameRef.current = requestAnimationFrame(gameLoop)
+      }
+    })
 
     return () => {
       window.removeEventListener("resize", resizeCanvas)
@@ -267,11 +276,6 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
         }
       }
 
-      // Give $2000 when pressing 9 (debug feature)
-      if (e.code === "Digit9") {
-        engine.givePlayerMoney(2000);
-        syncGameState(); // Update UI immediately
-      }
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -327,9 +331,9 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     }
   }
 
-  const handleRestart = () => {
+  const handleRestart = async () => {
     if (engineRef.current) {
-      engineRef.current.reset()
+      await engineRef.current.reset()
     }
   }
 

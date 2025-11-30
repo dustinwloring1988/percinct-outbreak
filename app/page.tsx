@@ -5,9 +5,10 @@ import { MainMenu } from "@/components/game/main-menu"
 import { GameCanvas } from "@/components/game/game-canvas"
 import { HelpScreen } from "@/components/game/help-screen"
 import { SettingsScreen } from "@/components/game/settings-screen"
+import StatsScreen from "@/components/game/stats-screen"
 import type { GameSettings } from "@/lib/game/types"
 
-export type GameScreen = "menu" | "game" | "help" | "settings"
+export type GameScreen = "menu" | "game" | "help" | "settings" | "stats"
 
 export default function Home() {
   const [screen, setScreen] = useState<GameScreen>("menu")
@@ -30,6 +31,7 @@ export default function Home() {
       {screen === "settings" && (
         <SettingsScreen settings={settings} onSettingsChange={setSettings} onBack={() => setScreen("menu")} />
       )}
+      {screen === "stats" && <StatsScreen onBack={() => setScreen("menu")} />}
     </main>
   )
 }

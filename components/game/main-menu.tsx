@@ -62,6 +62,13 @@ export function MainMenu({ onNavigate }: MainMenuProps) {
           >
             HOW TO PLAY
           </button>
+
+          <button
+            onClick={() => onNavigate("stats")}
+            className="group relative overflow-hidden bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-8 rounded font-bold text-lg transition-all duration-200 hover:scale-105"
+          >
+            STATS
+          </button>
         </div>
 
         {/* Footer */}
