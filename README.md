@@ -1,5 +1,7 @@
 # Precinct Outbreak - Zombie Survival
 
+[![Percinct Outbreak](./public/cover.png)](https://github.com/dustinwloring1988/percinct-outbreak)
+
 A 2D top-down zombie shooter inspired by Black Ops Zombies. Survive the night in a police station overrun by the undead.
 
 ## Features
