@@ -16,12 +16,14 @@ export default function Home() {
     sfxVolume: 0.7,
     difficulty: "normal",
     showTooltips: true,
+    showFPSCounter: false,
+    showMapCoordinates: false,
   })
 
   return (
     <main className="min-h-screen bg-background overflow-hidden">
       {screen === "menu" && <MainMenu onNavigate={setScreen} />}
-      {screen === "game" && <GameCanvas settings={settings} onExit={() => setScreen("menu")} />}
+      {screen === "game" && <GameCanvas settings={settings} onExit={() => setScreen("menu")} onSettings={() => setScreen("settings")} />}
       {screen === "help" && <HelpScreen onBack={() => setScreen("menu")} />}
       {screen === "settings" && (
         <SettingsScreen settings={settings} onSettingsChange={setSettings} onBack={() => setScreen("menu")} />

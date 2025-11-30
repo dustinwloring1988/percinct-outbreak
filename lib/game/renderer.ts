@@ -7,6 +7,11 @@ export class GameRenderer {
   private engine: GameEngine
   private animationFrame = 0
   showTooltips = true
+  showFPSCounter = false
+  showMapCoordinates = false
+  private fps = 0
+  private lastTime = 0
+  private frameCount = 0
 
   constructor(ctx: CanvasRenderingContext2D, engine: GameEngine) {
     this.ctx = ctx
@@ -15,6 +20,20 @@ export class GameRenderer {
 
   render(deltaTime: number) {
     this.animationFrame++
+
+    // Calculate FPS
+    const now = performance.now()
+    if (this.lastTime === 0) {
+      this.lastTime = now
+    }
+    this.frameCount++
+
+    if (now - this.lastTime >= 1000) {
+      this.fps = Math.round((this.frameCount * 1000) / (now - this.lastTime))
+      this.frameCount = 0
+      this.lastTime = now
+    }
+
     const { ctx, engine } = this
     const { state, map } = engine
     const { camera } = state
@@ -61,6 +80,9 @@ export class GameRenderer {
 
     // Restore context
     ctx.restore()
+
+    // Render UI elements after restoring context to avoid camera transform
+    this.renderUI()
   }
 
   private renderMap() {
@@ -607,5 +629,41 @@ export class GameRenderer {
 
     // Reset alpha
     ctx.globalAlpha = 1
+  }
+
+  private renderUI() {
+    const { ctx, engine } = this
+    const { player } = engine.state
+
+    // Display FPS counter if enabled
+    if (this.showFPSCounter) {
+      ctx.save()
+      ctx.resetTransform() // Reset transformation to draw UI in screen space
+
+      ctx.font = "bold 14px sans-serif"
+      ctx.fillStyle = "#00ff00"
+      ctx.textAlign = "left"
+      ctx.fillText(`FPS: ${this.fps}`, 10, 20)
+
+      ctx.restore()
+    }
+
+    // Display map coordinates if enabled
+    if (this.showMapCoordinates) {
+      ctx.save()
+      ctx.resetTransform() // Reset transformation to draw UI in screen space
+
+      ctx.font = "bold 14px sans-serif"
+      ctx.fillStyle = "#00aaff"
+      ctx.textAlign = "left"
+
+      // Calculate world position relative to screen
+      const worldX = Math.round(player.position.x)
+      const worldY = Math.round(player.position.y)
+
+      ctx.fillText(`Map: (${worldX}, ${worldY})`, 10, 40)
+
+      ctx.restore()
+    }
   }
 }

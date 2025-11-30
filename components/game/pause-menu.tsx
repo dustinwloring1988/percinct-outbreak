@@ -4,9 +4,10 @@ interface PauseMenuProps {
   onResume: () => void
   onRestart: () => void
   onExit: () => void
+  onSettings: () => void
 }
 
-export function PauseMenu({ onResume, onRestart, onExit }: PauseMenuProps) {
+export function PauseMenu({ onResume, onRestart, onExit, onSettings }: PauseMenuProps) {
   return (
     <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-card border border-border rounded-lg p-8 max-w-sm w-full mx-4">
@@ -25,6 +26,13 @@ export function PauseMenu({ onResume, onRestart, onExit }: PauseMenuProps) {
             className="bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-6 rounded font-bold transition-all"
           >
             RESTART
+          </button>
+
+          <button
+            onClick={onSettings}
+            className="bg-accent hover:bg-accent/80 text-accent-foreground py-3 px-6 rounded font-bold transition-all border border-border"
+          >
+            SETTINGS
           </button>
 
           <button

@@ -12,9 +12,10 @@ import { audioManager } from "@/lib/game/audio-manager"
 interface GameCanvasProps {
   settings: GameSettings
   onExit: () => void
+  onSettings: () => void
 }
 
-export function GameCanvas({ settings, onExit }: GameCanvasProps) {
+export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const rendererRef = useRef<GameRenderer | null>(null)
@@ -218,8 +219,10 @@ export function GameCanvas({ settings, onExit }: GameCanvasProps) {
   useEffect(() => {
     if (rendererRef.current) {
       rendererRef.current.showTooltips = settings.showTooltips
+      rendererRef.current.showFPSCounter = settings.showFPSCounter
+      rendererRef.current.showMapCoordinates = settings.showMapCoordinates
     }
-  }, [settings.showTooltips])
+  }, [settings.showTooltips, settings.showFPSCounter, settings.showMapCoordinates])
 
   // Input handlers
   useEffect(() => {
@@ -345,7 +348,15 @@ export function GameCanvas({ settings, onExit }: GameCanvasProps) {
       />
 
       {gameState.isPaused && !gameState.isGameOver && (
-        <PauseMenu onResume={handleResume} onRestart={handleRestart} onExit={onExit} />
+        <PauseMenu
+          onResume={handleResume}
+          onRestart={handleRestart}
+          onExit={onExit}
+          onSettings={() => {
+            // Switch to settings screen
+            onSettings();
+          }}
+        />
       )}
 
       {gameState.isGameOver && (

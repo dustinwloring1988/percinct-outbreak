@@ -89,6 +89,38 @@ export function SettingsScreen({ settings, onSettingsChange, onBack }: SettingsS
             </button>
             <p className="text-muted-foreground text-sm mt-1">Show perk descriptions near vending machines</p>
           </div>
+
+          {/* Show FPS Counter */}
+          <div>
+            <label className="block text-foreground font-bold mb-2">Show FPS Counter</label>
+            <button
+              onClick={() => onSettingsChange({ ...settings, showFPSCounter: !settings.showFPSCounter })}
+              className={`w-full py-2 px-4 rounded font-bold transition-all ${
+                settings.showFPSCounter
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {settings.showFPSCounter ? "ON" : "OFF"}
+            </button>
+            <p className="text-muted-foreground text-sm mt-1">Display frames per second counter on screen</p>
+          </div>
+
+          {/* Show Map Coordinates */}
+          <div>
+            <label className="block text-foreground font-bold mb-2">Show Map Coordinates</label>
+            <button
+              onClick={() => onSettingsChange({ ...settings, showMapCoordinates: !settings.showMapCoordinates })}
+              className={`w-full py-2 px-4 rounded font-bold transition-all ${
+                settings.showMapCoordinates
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {settings.showMapCoordinates ? "ON" : "OFF"}
+            </button>
+            <p className="text-muted-foreground text-sm mt-1">Display player position coordinates</p>
+          </div>
         </div>
 
         <button

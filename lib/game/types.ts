@@ -10,6 +10,8 @@ export interface GameSettings {
   sfxVolume: number
   difficulty: "easy" | "normal" | "hard"
   showTooltips: boolean
+  showFPSCounter: boolean
+  showMapCoordinates: boolean
 }
 
 export interface Entity {
