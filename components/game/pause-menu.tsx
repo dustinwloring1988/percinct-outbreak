@@ -1,13 +1,30 @@
 "use client"
 
+import { useState } from "react"
+import { InGameSettings } from "./in-game-settings"
+import type { GameSettings } from "@/lib/game/types"
+
 interface PauseMenuProps {
   onResume: () => void
   onRestart: () => void
   onExit: () => void
-  onSettings: () => void
+  settings: GameSettings
+  onSettingsChange: (settings: GameSettings) => void
 }
 
-export function PauseMenu({ onResume, onRestart, onExit, onSettings }: PauseMenuProps) {
+export function PauseMenu({ onResume, onRestart, onExit, settings, onSettingsChange }: PauseMenuProps) {
+  const [showSettings, setShowSettings] = useState(false)
+
+  if (showSettings) {
+    return (
+      <InGameSettings
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+        onBack={() => setShowSettings(false)}
+      />
+    )
+  }
+
   return (
     <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-card border border-border rounded-lg p-8 max-w-sm w-full mx-4">
@@ -29,7 +46,7 @@ export function PauseMenu({ onResume, onRestart, onExit, onSettings }: PauseMenu
           </button>
 
           <button
-            onClick={onSettings}
+            onClick={() => setShowSettings(true)}
             className="bg-accent hover:bg-accent/80 text-accent-foreground py-3 px-6 rounded font-bold transition-all border border-border"
           >
             SETTINGS

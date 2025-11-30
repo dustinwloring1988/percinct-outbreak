@@ -50,6 +50,7 @@ export class GameEngine {
   thrownProjectiles: ThrownProjectile[] = []
   private lastSpawnTime = 0
   private spawnInterval = SPAWN_INTERVAL_BASE
+  private accessibleSpawnPoints: SpawnPoint[] = []
 
   constructor() {
     this.map = generateMap()
@@ -60,6 +61,7 @@ export class GameEngine {
       rightMouseDown: false,
     }
     this.state = this.createInitialState()
+    this.updateAccessibleSpawnPoints()
   }
 
   private createInitialState(): GameState {
@@ -840,6 +842,68 @@ export class GameEngine {
     this.state.activePowerUps = this.state.activePowerUps.filter((p) => p.endTime > now)
   }
 
+  private updateAccessibleSpawnPoints() {
+    const accessibleRooms = this.getAccessibleRooms();
+    this.accessibleSpawnPoints = this.map.spawnPoints.filter((sp) =>
+      accessibleRooms.has(sp.roomId)
+    );
+  }
+
+  private getAccessibleRooms(): Set<string> {
+    const accessible = new Set<string>(["main"]); // Main lobby is always accessible
+
+    for (const door of this.map.doors) {
+      if (!door.isLocked && door.unlocksRoom) {
+        accessible.add(door.unlocksRoom);
+      }
+    }
+
+    return accessible;
+  }
+
+  private spawnZombie() {
+    if (this.state.zombiesRemaining <= 0) return
+
+    if (this.accessibleSpawnPoints.length === 0) return
+
+    const spawnPoint = this.accessibleSpawnPoints[Math.floor(Math.random() * this.accessibleSpawnPoints.length)]
+
+    // Determine zombie type based on wave
+    let type: ZombieType = "walker"
+    const roll = Math.random()
+    if (this.state.wave >= 5 && roll < 0.1) {
+      type = "brute"
+    } else if (this.state.wave >= 3 && roll < 0.3) {
+      type = "runner"
+    } else if (this.state.wave >= 2 && roll < 0.2) {
+      type = "crawler"
+    }
+
+    const stats = ZOMBIE_STATS[type]
+    const healthMultiplier = Math.pow(HEALTH_MULTIPLIER_PER_WAVE, this.state.wave - 1)
+
+    const zombie: Zombie = {
+      id: generateId(),
+      position: { ...spawnPoint.position },
+      velocity: { x: 0, y: 0 },
+      width: stats.size,
+      height: stats.size,
+      rotation: 0,
+      isActive: true,
+      health: stats.health * healthMultiplier,
+      maxHealth: stats.health * healthMultiplier,
+      damage: stats.damage,
+      speed: stats.speed,
+      attackCooldown: 1000,
+      lastAttackTime: 0,
+      type,
+      targetPosition: null,
+    }
+
+    this.state.zombies.push(zombie)
+    this.state.zombiesRemaining--
+  }
+
   private updateCamera(dt: number) {
     const { player, camera } = this.state
     const lerpFactor = 5 * dt
@@ -853,6 +917,30 @@ export class GameEngine {
 
     camera.x = Math.max(halfWidth, Math.min(MAP_WIDTH - halfWidth, camera.x))
     camera.y = Math.max(halfHeight, Math.min(MAP_HEIGHT - halfHeight, camera.y))
+  }
+
+  purchasePerk(vm: (typeof this.map.vendingMachines)[0]) {
+    const { player } = this.state
+
+    if (vm.purchased) return
+    if (this.state.activePerks.includes(vm.perk.effect)) return
+    if (player.money < vm.price) return
+
+    player.money -= vm.price
+    vm.purchased = true
+    this.state.activePerks.push(vm.perk.effect)
+    audioManager.play("vending")
+  }
+
+  switchWeapon(index: number) {
+    const { player } = this.state
+    if (index >= 0 && index < player.weapons.length) {
+      player.currentWeaponIndex = index
+    }
+  }
+
+  givePlayerMoney(amount: number) {
+    this.state.player.money += amount;
   }
 
   handleInteraction() {
@@ -876,6 +964,8 @@ export class GameEngine {
       if (tile) {
         tile.walkable = true
       }
+      // Update accessible spawn points since a new area is now accessible
+      this.updateAccessibleSpawnPoints();
       return
     }
 
@@ -1020,5 +1110,9 @@ export class GameEngine {
     if (index >= 0 && index < player.weapons.length) {
       player.currentWeaponIndex = index
     }
+  }
+
+  givePlayerMoney(amount: number) {
+    this.state.player.money += amount;
   }
 }

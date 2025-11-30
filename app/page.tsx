@@ -23,7 +23,9 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background overflow-hidden">
       {screen === "menu" && <MainMenu onNavigate={setScreen} />}
-      {screen === "game" && <GameCanvas settings={settings} onExit={() => setScreen("menu")} onSettings={() => setScreen("settings")} />}
+      {screen === "game" && <GameCanvas settings={settings} onExit={() => setScreen("menu")} onSettings={(newSettings) => {
+        setSettings(newSettings);
+      }} />}
       {screen === "help" && <HelpScreen onBack={() => setScreen("menu")} />}
       {screen === "settings" && (
         <SettingsScreen settings={settings} onSettingsChange={setSettings} onBack={() => setScreen("menu")} />

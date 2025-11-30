@@ -6,13 +6,14 @@ import { GameRenderer } from "@/lib/game/renderer"
 import { GameHUD } from "./game-hud"
 import { PauseMenu } from "./pause-menu"
 import { GameOverScreen } from "./game-over-screen"
+import { Minimap } from "./minimap"
 import type { GameSettings } from "@/lib/game/types"
 import { audioManager } from "@/lib/game/audio-manager"
 
 interface GameCanvasProps {
   settings: GameSettings
   onExit: () => void
-  onSettings: () => void
+  onSettings: (newSettings: GameSettings) => void
 }
 
 export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
@@ -265,6 +266,12 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
           engine.buyItem(nearbyItems[0].id)
         }
       }
+
+      // Give $2000 when pressing 9 (debug feature)
+      if (e.code === "Digit9") {
+        engine.givePlayerMoney(2000);
+        syncGameState(); // Update UI immediately
+      }
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -326,6 +333,11 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     }
   }
 
+  const onSettingsChange = (newSettings: GameSettings) => {
+    // Update settings state in parent
+    onSettings(newSettings);
+  }
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
@@ -347,15 +359,22 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
         currentWeaponIndex={gameState.currentWeaponIndex}
       />
 
+      {engineRef.current && (
+        <Minimap
+          gameState={engineRef.current.state}
+          mapDoors={engineRef.current.map.doors || []}
+          mapTiles={engineRef.current.map.tiles || []}
+          mapSize={{ width: 4800, height: 3600 }} // Based on constants.ts
+        />
+      )}
+
       {gameState.isPaused && !gameState.isGameOver && (
         <PauseMenu
           onResume={handleResume}
           onRestart={handleRestart}
           onExit={onExit}
-          onSettings={() => {
-            // Switch to settings screen
-            onSettings();
-          }}
+          settings={settings}
+          onSettingsChange={onSettingsChange}
         />
       )}
 
