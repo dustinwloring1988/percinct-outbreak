@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "Precinct Outbreak - Zombie Survival",
   description:
     "A 2D top-down zombie shooter inspired by Black Ops Zombies. Survive the night in a police station overrun by the undead.",
-  generator: "v0.app",
+  generator: "Dustin Loring",
 }
 
 export const viewport: Viewport = {
