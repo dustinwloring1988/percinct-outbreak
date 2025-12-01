@@ -80,6 +80,15 @@ export function MainMenu({ onNavigate }: MainMenuProps) {
           </button>
 
           <button
+            ref={statsButtonRef}
+            onClick={() => onNavigate("stats")}
+            className={`group relative overflow-hidden bg-secondary ${focusedKey === 'stats' ? 'ring-4 ring-primary/50' : 'hover:bg-secondary/80'} text-secondary-foreground py-3 px-8 rounded font-bold text-lg transition-all duration-200 hover:scale-105 focus:outline-none`}
+            onFocus={() => registerMenuItem(statsButtonRef.current!, 'stats')}
+          >
+            STATS
+          </button>
+
+          <button
             ref={settingsButtonRef}
             onClick={() => onNavigate("settings")}
             className={`group relative overflow-hidden bg-secondary ${focusedKey === 'settings' ? 'ring-4 ring-primary/50' : 'hover:bg-secondary/80'} text-secondary-foreground py-3 px-8 rounded font-bold text-lg transition-all duration-200 hover:scale-105 focus:outline-none`}
@@ -95,15 +104,6 @@ export function MainMenu({ onNavigate }: MainMenuProps) {
             onFocus={() => registerMenuItem(helpButtonRef.current!, 'help')}
           >
             HOW TO PLAY
-          </button>
-
-          <button
-            ref={statsButtonRef}
-            onClick={() => onNavigate("stats")}
-            className={`group relative overflow-hidden bg-secondary ${focusedKey === 'stats' ? 'ring-4 ring-primary/50' : 'hover:bg-secondary/80'} text-secondary-foreground py-3 px-8 rounded font-bold text-lg transition-all duration-200 hover:scale-105 focus:outline-none`}
-            onFocus={() => registerMenuItem(statsButtonRef.current!, 'stats')}
-          >
-            STATS
           </button>
         </div>
 

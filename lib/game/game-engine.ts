@@ -792,10 +792,16 @@ export class GameEngine {
       points *= 2
     }
 
+    // Calculate money regardless of zombie type - always $100, doubled if double-points is active
+    let money = 100
+    if (this.state.activePowerUps.some((p) => p.type === "double-points")) {
+      money *= 2
+    }
+
     // Track stats
     if (this.stats) {
       this.stats.totalKills += 1;
-      this.stats.totalMoneyEarned += Math.floor(points / 10);
+      this.stats.totalMoneyEarned += money;
 
       // Get the weapon used to kill the zombie
       // We'll assume the current weapon for now since tracking exact weapon would require more changes
@@ -811,7 +817,7 @@ export class GameEngine {
     }
 
     this.state.score += points
-    this.state.player.money += Math.floor(points / 10)
+    this.state.player.money += money
 
     // Power-up drop chance
     if (Math.random() < POWER_UP_DROP_CHANCE) {
