@@ -12,10 +12,19 @@ export class GameRenderer {
   private fps = 0
   private lastTime = 0
   private frameCount = 0
+  zoom = 1.0 // Default zoom level
 
   constructor(ctx: CanvasRenderingContext2D, engine: GameEngine) {
     this.ctx = ctx
     this.engine = engine
+  }
+
+  getZoomAdjustedViewportWidth(): number {
+    return this.engine.viewportWidth / this.zoom;
+  }
+
+  getZoomAdjustedViewportHeight(): number {
+    return this.engine.viewportHeight / this.zoom;
   }
 
   render(deltaTime: number) {
@@ -42,9 +51,11 @@ export class GameRenderer {
     ctx.fillStyle = "#1a1a22"
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
 
-    // Save context and apply camera transform
+    // Save context and apply camera transform with zoom
     ctx.save()
-    ctx.translate(ctx.canvas.width / 2 - camera.x, ctx.canvas.height / 2 - camera.y)
+    ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2)
+    ctx.scale(this.zoom, this.zoom)
+    ctx.translate(-camera.x, -camera.y)
 
     // Render map tiles
     this.renderMap()

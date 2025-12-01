@@ -14,7 +14,7 @@ export const PLAYER_ROLL_DURATION = 300
 export const PLAYER_ROLL_COOLDOWN = 800
 export const PLAYER_MAX_HEALTH = 100
 export const PLAYER_MAX_ARMOR = 100
-export const PLAYER_KNIFE_DAMAGE = 50
+export const PLAYER_KNIFE_DAMAGE = 75
 export const PLAYER_KNIFE_RANGE = 60
 export const PLAYER_KNIFE_COOLDOWN = 400
 
@@ -48,8 +48,8 @@ export const STARTING_PISTOL: Weapon = {
   reloadTime: 1500,
   magazineSize: 8,
   currentAmmo: 8,
-  reserveAmmo: 48,
-  maxReserveAmmo: 80,
+  reserveAmmo: 96,
+  maxReserveAmmo: 120,
   range: 400,
   spread: 0.05,
   bulletSpeed: 800,

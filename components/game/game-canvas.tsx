@@ -207,6 +207,9 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     const renderer = new GameRenderer(ctx, engine)
     rendererRef.current = renderer
 
+    // Start zoomed in (zoom level of 1.5 means objects appear 1.5x larger)
+    renderer.zoom = 1.5
+
     // Initialize audio
     audioManager.init()
     audioManager.playBackground()
@@ -216,6 +219,9 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
       if (engineRef.current) {
         // Set viewport after initialization
         engineRef.current.setViewport(canvas.width, canvas.height)
+
+        // Pass renderer to engine so it can access zoom information
+        engineRef.current.setRenderer(renderer)
 
         // Start game loop only after initialization is complete
         animationFrameRef.current = requestAnimationFrame(gameLoop)
@@ -351,16 +357,13 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
           engine.startReload();
         }
 
-        // Switch weapons with bumpers
+        // Switch weapons with left bumper
         if (engine.input.gamepad.leftShoulder) {
           engine.swapWeapon();
         }
-        if (engine.input.gamepad.rightShoulder) {
-          engine.swapWeapon();
-        }
 
-        // Throw grenade with Y button
-        if (engine.input.gamepad.y) {
+        // Throw grenade with Right Trigger (RT)
+        if (engine.input.gamepad.rightTrigger) {
           engine.throwGrenade();
         }
 
@@ -410,6 +413,10 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
   const handleRestart = async () => {
     if (engineRef.current) {
       await engineRef.current.reset()
+      // After reset, set renderer again so engine has access to zoom information
+      if (rendererRef.current) {
+        engineRef.current.setRenderer(rendererRef.current)
+      }
     }
   }
 

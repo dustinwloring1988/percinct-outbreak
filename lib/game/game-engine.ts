@@ -58,9 +58,14 @@ export class GameEngine {
   private lastStatsSaveTime = 0;
   private gamepadManager: GamepadManager;
   private wasUsingRightStick: boolean = false;
+  private renderer: any = null; // Store a reference to the renderer to access zoom
 
   public get initialized() {
     return this.isInitialized;
+  }
+
+  setRenderer(renderer: any) {
+    this.renderer = renderer;
   }
 
   constructor() {
@@ -350,8 +355,8 @@ export class GameEngine {
     }
 
     // Knife attack
-    // Support both mouse right-click and gamepad Y button
-    const knifeInput = rightMouseDown || (gamepad && gamepad.y);
+    // Support mouse right-click and right stick press only
+    const knifeInput = rightMouseDown || (gamepad && gamepad.rightStickPressed);
     if (knifeInput && player.knifeCooldown <= 0) {
       player.knifeAttacking = true
       player.knifeCooldown = PLAYER_KNIFE_COOLDOWN
@@ -537,8 +542,8 @@ export class GameEngine {
   // Check if weapon switch was triggered via gamepad
   isWeaponSwapTriggered(): boolean {
     const { keys, gamepad } = this.input;
-    // Q key on keyboard or left/right bumpers on gamepad
-    return keys.has("KeyQ") || (gamepad && (gamepad.leftShoulder || gamepad.rightShoulder));
+    // Q key on keyboard or left bumper on gamepad
+    return keys.has("KeyQ") || (gamepad && gamepad.leftShoulder);
   }
 
   swapWeapon() {
@@ -1121,9 +1126,17 @@ export class GameEngine {
     camera.x += (player.position.x - camera.x) * lerpFactor
     camera.y += (player.position.y - camera.y) * lerpFactor
 
-    // Clamp camera to map bounds
-    const halfWidth = this.viewportWidth / 2
-    const halfHeight = this.viewportHeight / 2
+    // Clamp camera to map bounds, accounting for zoom if renderer is available
+    let halfWidth, halfHeight;
+    if (this.renderer) {
+      // Use zoom-adjusted viewport dimensions
+      halfWidth = this.renderer.getZoomAdjustedViewportWidth() / 2;
+      halfHeight = this.renderer.getZoomAdjustedViewportHeight() / 2;
+    } else {
+      // Fallback to regular viewport dimensions
+      halfWidth = this.viewportWidth / 2;
+      halfHeight = this.viewportHeight / 2;
+    }
 
     camera.x = Math.max(halfWidth, Math.min(MAP_WIDTH - halfWidth, camera.x))
     camera.y = Math.max(halfHeight, Math.min(MAP_HEIGHT - halfHeight, camera.y))

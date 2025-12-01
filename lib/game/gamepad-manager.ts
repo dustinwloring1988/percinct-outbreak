@@ -30,6 +30,10 @@ export interface GamepadInputState {
   start: boolean; // Start button
   select: boolean; // Select/Back button
 
+  // Stick press buttons
+  leftStickPressed: boolean; // L3 (left stick pressed)
+  rightStickPressed: boolean; // R3 (right stick pressed)
+
   // Current gamepad index
   gamepadIndex: number | null;
 }
@@ -55,6 +59,8 @@ export class GamepadManager {
     '13': 'down',         // D-pad down
     '14': 'left',         // D-pad left
     '15': 'right',        // D-pad right
+    '10': 'leftStickPressed',  // L3 (left stick press)
+    '11': 'rightStickPressed', // R3 (right stick press)
   };
 
   // Axis thresholds for analog stick input
@@ -97,6 +103,8 @@ export class GamepadManager {
       rightStickY: 0,
       start: false,
       select: false,
+      leftStickPressed: false,
+      rightStickPressed: false,
       gamepadIndex: index
     };
 
@@ -194,6 +202,8 @@ export class GamepadManager {
           rightStickY: 0,
           start: false,
           select: false,
+          leftStickPressed: false,
+          rightStickPressed: false,
           gamepadIndex: i
         };
 
