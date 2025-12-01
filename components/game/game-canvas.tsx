@@ -61,6 +61,9 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     nearbyItems: [],
   })
 
+  const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
+  const [isUsingMouse, setIsUsingMouse] = useState(false);
+
   const syncGameState = useCallback(() => {
     const engine = engineRef.current
     if (!engine) return
@@ -239,10 +242,11 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     const engine = engineRef.current
     if (!engine) return
 
+    // Handle keyboard input
     const handleKeyDown = (e: KeyboardEvent) => {
       engine.input.keys.add(e.code)
 
-      // Pause
+      // Pause - only keyboard (gamepad start button handled separately)
       if (e.code === "Escape") {
         engine.state.isPaused = !engine.state.isPaused
       }
@@ -275,7 +279,6 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
           engine.buyItem(nearbyItems[0].id)
         }
       }
-
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -283,7 +286,22 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-      engine.input.mousePosition = { x: e.clientX, y: e.clientY }
+      const currentPosition = { x: e.clientX, y: e.clientY };
+      engine.input.mousePosition = currentPosition;
+
+      // Check if mouse has moved significantly (threshold of 5 pixels)
+      if (lastMousePosition) {
+        const distance = Math.sqrt(
+          Math.pow(currentPosition.x - lastMousePosition.x, 2) +
+          Math.pow(currentPosition.y - lastMousePosition.y, 2)
+        );
+
+        if (distance > 5 && !isUsingMouse) {
+          setIsUsingMouse(true);
+        }
+      }
+
+      setLastMousePosition(currentPosition);
     }
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -300,21 +318,79 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
       e.preventDefault()
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("keyup", handleKeyUp)
-    window.addEventListener("mousemove", handleMouseMove)
-    window.addEventListener("mousedown", handleMouseDown)
-    window.addEventListener("mouseup", handleMouseUp)
-    window.addEventListener("contextmenu", handleContextMenu)
+    // Handle gamepad input continuously
+    const handleGamepadInput = () => {
+      if (engine.input.gamepad) {
+        // Check for any significant gamepad input to switch to controller mode
+        const isUsingGamepad = (
+          engine.input.gamepad.rightTrigger ||
+          engine.input.gamepad.leftTrigger ||
+          Math.abs(engine.input.gamepad.rightStickX) > 0.1 ||
+          Math.abs(engine.input.gamepad.rightStickY) > 0.1 ||
+          Math.abs(engine.input.gamepad.leftStickX) > 0.1 ||
+          Math.abs(engine.input.gamepad.leftStickY) > 0.1 ||
+          engine.input.gamepad.a || engine.input.gamepad.b ||
+          engine.input.gamepad.x || engine.input.gamepad.y ||
+          engine.input.gamepad.leftShoulder || engine.input.gamepad.rightShoulder ||
+          engine.input.gamepad.up || engine.input.gamepad.down ||
+          engine.input.gamepad.left || engine.input.gamepad.right ||
+          engine.input.gamepad.start || engine.input.gamepad.select
+        );
+
+        if (isUsingGamepad && isUsingMouse) {
+          setIsUsingMouse(false); // Switch to controller mode
+        }
+
+        // Pause with Start button
+        if (engine.input.gamepad.start) {
+          engine.state.isPaused = !engine.state.isPaused;
+        }
+
+        // Reload with X button
+        if (engine.input.gamepad.x) {
+          engine.startReload();
+        }
+
+        // Switch weapons with bumpers
+        if (engine.input.gamepad.leftShoulder) {
+          engine.swapWeapon();
+        }
+        if (engine.input.gamepad.rightShoulder) {
+          engine.swapWeapon();
+        }
+
+        // Throw grenade with Y button
+        if (engine.input.gamepad.y) {
+          engine.throwGrenade();
+        }
+
+        // Interact/Buy with A button
+        if (engine.input.gamepad.a && gameState.nearbyItems.length > 0) {
+          engine.buyItem(gameState.nearbyItems[0].id);
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("contextmenu", handleContextMenu);
+
+    // Set up gamepad interval
+    const gamepadInterval = setInterval(handleGamepadInput, 50); // Check gamepad state every 50ms
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("keyup", handleKeyUp)
-      window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("mousedown", handleMouseDown)
-      window.removeEventListener("mouseup", handleMouseUp)
-      window.removeEventListener("contextmenu", handleContextMenu)
-    }
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("contextmenu", handleContextMenu);
+      clearInterval(gamepadInterval);
+    };
   }, [gameState.nearbyItems])
 
   useEffect(() => {
@@ -344,7 +420,10 @@ export function GameCanvas({ settings, onExit, onSettings }: GameCanvasProps) {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
+      <canvas
+        ref={canvasRef}
+        className={`absolute inset-0 ${(isUsingMouse || gameState.isPaused || gameState.isGameOver) ? 'cursor-crosshair' : 'cursor-none'}`}
+      />
 
       <GameHUD
         health={gameState.health}

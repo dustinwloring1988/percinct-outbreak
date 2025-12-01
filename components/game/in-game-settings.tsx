@@ -1,6 +1,8 @@
 "use client"
 
+import { useRef } from "react"
 import type { GameSettings } from "@/lib/game/types"
+import { useGamepadNavigation } from '@/hooks/use-gamepad-navigation'
 
 interface InGameSettingsProps {
   settings: GameSettings
@@ -9,6 +11,42 @@ interface InGameSettingsProps {
 }
 
 export function InGameSettings({ settings, onSettingsChange, onBack }: InGameSettingsProps) {
+  const backBtnRef = useRef<HTMLButtonElement>(null)
+  const tooltipsBtnRef = useRef<HTMLButtonElement>(null)
+  const fpsBtnRef = useRef<HTMLButtonElement>(null)
+  const coordinatesBtnRef = useRef<HTMLButtonElement>(null)
+
+  const {
+    registerMenuItem,
+    gamepadConnected,
+    focusedKey
+  } = useGamepadNavigation({
+    onSelect: () => {
+      // Handle selection based on the focused element
+      switch(focusedKey) {
+        case 'back':
+          onBack();
+          break;
+        case 'tooltips':
+          onSettingsChange({ ...settings, showTooltips: !settings.showTooltips });
+          break;
+        case 'fps':
+          onSettingsChange({ ...settings, showFPSCounter: !settings.showFPSCounter });
+          break;
+        case 'coordinates':
+          onSettingsChange({ ...settings, showMapCoordinates: !settings.showMapCoordinates });
+          break;
+        default:
+          break;
+      }
+    },
+    onBack: onBack  // Map the B button to back
+  })
+
+  // Helper function to get focused className
+  const getFocusedClass = (key: string) =>
+    focusedKey === key ? 'ring-4 ring-primary/50' : '';
+
   return (
     <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-card border border-border rounded-lg p-8 max-w-md w-full mx-4">
@@ -59,12 +97,14 @@ export function InGameSettings({ settings, onSettingsChange, onBack }: InGameSet
           <div>
             <label className="block text-foreground font-bold mb-2">Show Tooltips</label>
             <button
+              ref={tooltipsBtnRef}
               onClick={() => onSettingsChange({ ...settings, showTooltips: !settings.showTooltips })}
-              className={`w-full py-2 px-4 rounded font-bold transition-all ${
+              className={`w-full py-2 px-4 rounded font-bold transition-all ${getFocusedClass('tooltips')} ${
                 settings.showTooltips
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
+              } focus:outline-none`}
+              onFocus={() => registerMenuItem(tooltipsBtnRef.current!, 'tooltips')}
             >
               {settings.showTooltips ? "ON" : "OFF"}
             </button>
@@ -75,12 +115,14 @@ export function InGameSettings({ settings, onSettingsChange, onBack }: InGameSet
           <div>
             <label className="block text-foreground font-bold mb-2">Show FPS Counter</label>
             <button
+              ref={fpsBtnRef}
               onClick={() => onSettingsChange({ ...settings, showFPSCounter: !settings.showFPSCounter })}
-              className={`w-full py-2 px-4 rounded font-bold transition-all ${
+              className={`w-full py-2 px-4 rounded font-bold transition-all ${getFocusedClass('fps')} ${
                 settings.showFPSCounter
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
+              } focus:outline-none`}
+              onFocus={() => registerMenuItem(fpsBtnRef.current!, 'fps')}
             >
               {settings.showFPSCounter ? "ON" : "OFF"}
             </button>
@@ -91,12 +133,14 @@ export function InGameSettings({ settings, onSettingsChange, onBack }: InGameSet
           <div>
             <label className="block text-foreground font-bold mb-2">Show Map Coordinates</label>
             <button
+              ref={coordinatesBtnRef}
               onClick={() => onSettingsChange({ ...settings, showMapCoordinates: !settings.showMapCoordinates })}
-              className={`w-full py-2 px-4 rounded font-bold transition-all ${
+              className={`w-full py-2 px-4 rounded font-bold transition-all ${getFocusedClass('coordinates')} ${
                 settings.showMapCoordinates
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
+              } focus:outline-none`}
+              onFocus={() => registerMenuItem(coordinatesBtnRef.current!, 'coordinates')}
             >
               {settings.showMapCoordinates ? "ON" : "OFF"}
             </button>
@@ -105,11 +149,22 @@ export function InGameSettings({ settings, onSettingsChange, onBack }: InGameSet
         </div>
 
         <button
+          ref={backBtnRef}
           onClick={onBack}
-          className="w-full mt-8 bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 rounded font-bold transition-all"
+          className={`w-full mt-8 bg-secondary ${getFocusedClass('back')} text-secondary-foreground py-3 rounded font-bold transition-all focus:outline-none`}
+          onFocus={() => registerMenuItem(backBtnRef.current!, 'back')}
         >
           BACK
         </button>
+
+        {gamepadConnected && (
+          <div className="mt-4 text-center">
+            <p className="text-primary text-sm font-mono flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Controller Connected
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

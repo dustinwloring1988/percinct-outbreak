@@ -1,5 +1,8 @@
 "use client"
 
+import { useRef } from "react"
+import { useGamepadNavigation } from '@/hooks/use-gamepad-navigation'
+
 interface GameOverScreenProps {
   score: number
   wave: number
@@ -8,6 +11,22 @@ interface GameOverScreenProps {
 }
 
 export function GameOverScreen({ score, wave, onRestart, onExit }: GameOverScreenProps) {
+  const restartButtonRef = useRef<HTMLButtonElement>(null)
+  const exitButtonRef = useRef<HTMLButtonElement>(null)
+
+  const {
+    registerMenuItem,
+    gamepadConnected,
+    focusedKey
+  } = useGamepadNavigation({
+    onSelect: () => {
+      // Trigger click on the focused button
+      if (focusedKey === 'restart') restartButtonRef.current?.click()
+      else if (focusedKey === 'exit') exitButtonRef.current?.click()
+    },
+    onBack: onExit  // Map the B button to exit
+  })
+
   return (
     <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-50">
       <div className="text-center px-4">
@@ -28,19 +47,32 @@ export function GameOverScreen({ score, wave, onRestart, onExit }: GameOverScree
 
         <div className="flex flex-col gap-4 max-w-xs mx-auto">
           <button
+            ref={restartButtonRef}
             onClick={onRestart}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground py-4 px-8 rounded font-bold text-xl transition-all hover:scale-105"
+            className={`bg-primary ${focusedKey === 'restart' ? 'ring-4 ring-primary/50' : 'hover:bg-primary/90'} text-primary-foreground py-4 px-8 rounded font-bold text-xl transition-all hover:scale-105 focus:outline-none`}
+            onFocus={() => registerMenuItem(restartButtonRef.current!, 'restart')}
           >
             TRY AGAIN
           </button>
 
           <button
+            ref={exitButtonRef}
             onClick={onExit}
-            className="bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-8 rounded font-bold transition-all"
+            className={`bg-secondary ${focusedKey === 'exit' ? 'ring-4 ring-primary/50' : 'hover:bg-secondary/80'} text-secondary-foreground py-3 px-8 rounded font-bold transition-all focus:outline-none`}
+            onFocus={() => registerMenuItem(exitButtonRef.current!, 'exit')}
           >
             EXIT TO MENU
           </button>
         </div>
+
+        {gamepadConnected && (
+          <div className="mt-4 text-center">
+            <p className="text-primary text-sm font-mono flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Controller Connected
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

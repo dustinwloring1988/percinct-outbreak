@@ -14,6 +14,7 @@ import type {
   SpawnPoint,
   Weapon as WeaponType,
 } from "./types"
+import { GamepadManager } from "./gamepad-manager"
 import { WEAPONS, THROWABLES, ZOMBIE_STATS, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE } from "./constants"
 import { generateId, vectorAdd, vectorNormalize, vectorScale, vectorDistance } from "./utils"
 import { generateMap } from "./map-generator"
@@ -55,12 +56,15 @@ export class GameEngine {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
   private lastStatsSaveTime = 0;
+  private gamepadManager: GamepadManager;
+  private wasUsingRightStick: boolean = false;
 
   public get initialized() {
     return this.isInitialized;
   }
 
   constructor() {
+    this.gamepadManager = new GamepadManager();
     // Initialize database first, but don't wait in constructor
     this.initPromise = this.initialize();
   }
@@ -75,6 +79,7 @@ export class GameEngine {
       mousePosition: { x: 0, y: 0 },
       mouseDown: false,
       rightMouseDown: false,
+      lastGamepadUpdate: 0,
     }
     this.state = this.createInitialState()
     this.updateAccessibleSpawnPoints()
@@ -180,6 +185,16 @@ export class GameEngine {
   update(deltaTime: number) {
     if (this.state.isPaused || this.state.isGameOver) return
 
+    // Update gamepad state
+    this.gamepadManager.update();
+    const gamepadState = this.gamepadManager.getGamepadState();
+
+    // Update input state with gamepad data
+    if (gamepadState) {
+      this.input.gamepad = gamepadState;
+      this.input.lastGamepadUpdate = Date.now();
+    }
+
     const dt = deltaTime / 1000 // Convert to seconds
 
     // Track play time if the game is running
@@ -210,13 +225,13 @@ export class GameEngine {
 
   private updatePlayer(dt: number) {
     const { player } = this.state
-    const { keys, mousePosition, mouseDown, rightMouseDown } = this.input
+    const { keys, mousePosition, mouseDown, rightMouseDown, gamepad } = this.input
 
     // Update cooldowns
     if (player.rollCooldown > 0) player.rollCooldown -= dt * 1000
     if (player.knifeCooldown > 0) player.knifeCooldown -= dt * 1000
 
-    // Handle rolling
+    // Handle rolling (now supports both keyboard and gamepad)
     if (player.isRolling) {
       const rollProgress =
         (PLAYER_ROLL_DURATION - player.rollCooldown + PLAYER_ROLL_COOLDOWN - PLAYER_ROLL_DURATION) /
@@ -233,18 +248,37 @@ export class GameEngine {
       }
     }
 
-    // Calculate movement direction
+    // Calculate movement direction (now supports keyboard and gamepad)
     let moveX = 0
     let moveY = 0
+
+    // Keyboard input
     if (keys.has("KeyW") || keys.has("ArrowUp")) moveY -= 1
     if (keys.has("KeyS") || keys.has("ArrowDown")) moveY += 1
     if (keys.has("KeyA") || keys.has("ArrowLeft")) moveX -= 1
     if (keys.has("KeyD") || keys.has("ArrowRight")) moveX += 1
 
-    // Stance changes
+    // Gamepad input (using left stick and D-pad)
+    if (gamepad) {
+      // Use both left stick and D-pad for movement
+      const leftStickX = Math.abs(gamepad.leftStickX) > 0.1 ? gamepad.leftStickX : 0;
+      const leftStickY = Math.abs(gamepad.leftStickY) > 0.1 ? gamepad.leftStickY : 0;
 
-    // Roll initiation
-    if (keys.has("Space") && player.rollCooldown <= 0 && (moveX !== 0 || moveY !== 0)) {
+      moveX += leftStickX;
+      moveY += leftStickY;
+
+      if (gamepad.up) moveY -= 1;
+      if (gamepad.down) moveY += 1;
+      if (gamepad.left) moveX -= 1;
+      if (gamepad.right) moveX += 1;
+    }
+
+    // Normalize movement if both keyboard and gamepad are used
+    if (Math.abs(moveX) > 1) moveX = Math.sign(moveX);
+    if (Math.abs(moveY) > 1) moveY = Math.sign(moveY);
+
+    // Roll initiation (now supports both keyboard and gamepad)
+    if ((keys.has("Space") || (gamepad && gamepad.b)) && player.rollCooldown <= 0 && (moveX !== 0 || moveY !== 0)) {
       player.isRolling = true
       player.rollCooldown = PLAYER_ROLL_COOLDOWN
       player.rollDirection = vectorNormalize({ x: moveX, y: moveY })
@@ -279,13 +313,46 @@ export class GameEngine {
       }
     }
 
-    // Player rotation towards mouse
+    // Player rotation (now supports both mouse and right analog stick)
+    const rightStickActive = gamepad && (Math.abs(gamepad.rightStickX) > 0.1 || Math.abs(gamepad.rightStickY) > 0.1);
     const worldMouseX = mousePosition.x - this.viewportWidth / 2 + this.state.camera.x
     const worldMouseY = mousePosition.y - this.viewportHeight / 2 + this.state.camera.y
-    player.rotation = Math.atan2(worldMouseY - player.position.y, worldMouseX - player.position.x)
+    const mouseRotation = Math.atan2(worldMouseY - player.position.y, worldMouseX - player.position.x);
+
+    if (rightStickActive) {
+      // Use right stick for aiming
+      const rightStickRotation = Math.atan2(gamepad.rightStickY, gamepad.rightStickX);
+      player.rotation = rightStickRotation;
+
+      // Update mouse position to reflect where the player is aiming with the right stick
+      // This will move the cursor around the player to show aiming direction
+      const aimDistance = 300; // Distance from player to position cursor
+      const aimWorldX = player.position.x + Math.cos(rightStickRotation) * aimDistance;
+      const aimWorldY = player.position.y + Math.sin(rightStickRotation) * aimDistance;
+
+      // Convert world coordinates back to screen coordinates for cursor position
+      const newMouseX = aimWorldX - this.state.camera.x + this.viewportWidth / 2;
+      const newMouseY = aimWorldY - this.state.camera.y + this.viewportHeight / 2;
+
+      // Update the input mouse position to reflect the new aiming direction
+      this.input.mousePosition = { x: newMouseX, y: newMouseY };
+
+      this.wasUsingRightStick = true;
+    } else {
+      // Use mouse for aiming when no gamepad or right stick is used
+      if (this.wasUsingRightStick) {
+        // When switching from right stick back to mouse, ensure we use the current mouse position
+        player.rotation = mouseRotation;
+        this.wasUsingRightStick = false;
+      } else {
+        player.rotation = mouseRotation;
+      }
+    }
 
     // Knife attack
-    if (rightMouseDown && player.knifeCooldown <= 0) {
+    // Support both mouse right-click and gamepad Y button
+    const knifeInput = rightMouseDown || (gamepad && gamepad.y);
+    if (knifeInput && player.knifeCooldown <= 0) {
       player.knifeAttacking = true
       player.knifeCooldown = PLAYER_KNIFE_COOLDOWN
       this.performKnifeAttack()
@@ -295,12 +362,45 @@ export class GameEngine {
     }
 
     // Shooting
-    if (mouseDown) {
+    // Support both mouse left-click and gamepad right trigger
+    const shootInput = mouseDown || (gamepad && gamepad.rightTrigger);
+    if (shootInput) {
       this.tryShoot()
     }
 
     // Update weapon reload
     const weapon = player.weapons[player.currentWeaponIndex]
+
+    // Reload handling - now with gamepad support
+    if (this.isReloadTriggered() && weapon?.currentAmmo !== weapon?.magazineSize && weapon?.reserveAmmo > 0 && !weapon?.isReloading) {
+      this.startReload();
+    }
+
+    // Weapon switching - now with gamepad support
+    if (this.isWeaponSwapTriggered()) {
+      this.swapWeapon();
+    }
+
+    // Weapon selection with D-pad (left/right) - separate from swap
+    if (gamepad) {
+      // Check if D-pad left/right was just pressed (not held)
+      const currentGamepadIndex = gamepad.gamepadIndex;
+      if (currentGamepadIndex !== null) {
+        const current = this.gamepadManager.getGamepadState(currentGamepadIndex);
+        const previous = this.gamepadManager.getPreviousGamepadState(currentGamepadIndex);
+
+        if (current && previous) {
+          // Cycle to next weapon with D-pad right
+          if (current.right && !previous.right && player.weapons.length > 1) {
+            player.currentWeaponIndex = (player.currentWeaponIndex + 1) % player.weapons.length;
+          }
+          // Cycle to previous weapon with D-pad left
+          else if (current.left && !previous.left && player.weapons.length > 1) {
+            player.currentWeaponIndex = (player.currentWeaponIndex + player.weapons.length - 1) % player.weapons.length;
+          }
+        }
+      }
+    }
     if (weapon?.isReloading) {
       const reloadTime = this.state.activePerks.includes("quick-reload") ? weapon.reloadTime * 0.7 : weapon.reloadTime
       if (Date.now() - weapon.reloadStartTime >= reloadTime) {
@@ -427,6 +527,20 @@ export class GameEngine {
     audioManager.play("reload")
   }
 
+  // Check if reload was triggered via gamepad
+  isReloadTriggered(): boolean {
+    const { keys, gamepad } = this.input;
+    // R key on keyboard or X button on gamepad
+    return keys.has("KeyR") || (gamepad && gamepad.x);
+  }
+
+  // Check if weapon switch was triggered via gamepad
+  isWeaponSwapTriggered(): boolean {
+    const { keys, gamepad } = this.input;
+    // Q key on keyboard or left/right bumpers on gamepad
+    return keys.has("KeyQ") || (gamepad && (gamepad.leftShoulder || gamepad.rightShoulder));
+  }
+
   swapWeapon() {
     const { player } = this.state
     if (player.weapons.length > 1) {
@@ -438,8 +552,22 @@ export class GameEngine {
     const { player } = this.state
     if (!player.throwable || player.throwable.count <= 0) return
 
-    const worldMouseX = this.input.mousePosition.x - this.viewportWidth / 2 + this.state.camera.x
-    const worldMouseY = this.input.mousePosition.y - this.viewportHeight / 2 + this.state.camera.y
+    // For gamepad, we'll still use mouse position for aiming, but could potentially
+    // use right stick position for direction if available
+    let targetX, targetY;
+    if (this.input.gamepad && (Math.abs(this.input.gamepad.rightStickX) > 0.1 || Math.abs(this.input.gamepad.rightStickY) > 0.1)) {
+      // If right stick is being used, aim in the direction of the right stick
+      const rightStickDir = Math.atan2(this.input.gamepad.rightStickY, this.input.gamepad.rightStickX);
+      const aimDistance = 200; // Adjust as needed
+      targetX = player.position.x + Math.cos(rightStickDir) * aimDistance;
+      targetY = player.position.y + Math.sin(rightStickDir) * aimDistance;
+    } else {
+      // Default to mouse position
+      const worldMouseX = this.input.mousePosition.x - this.viewportWidth / 2 + this.state.camera.x
+      const worldMouseY = this.input.mousePosition.y - this.viewportHeight / 2 + this.state.camera.y
+      targetX = worldMouseX;
+      targetY = worldMouseY;
+    }
 
     const projectile: ThrownProjectile = {
       id: generateId(),
@@ -450,7 +578,7 @@ export class GameEngine {
       rotation: 0,
       isActive: true,
       throwable: { ...player.throwable },
-      targetPosition: { x: worldMouseX, y: worldMouseY },
+      targetPosition: { x: targetX, y: targetY },
       speed: 400,
     }
 

@@ -1,4 +1,5 @@
 // Core game types - modular and extensible
+import type { GamepadInputState } from "./gamepad-manager"
 
 export interface Vector2 {
   x: number
@@ -187,6 +188,8 @@ export interface InputState {
   mousePosition: Vector2
   mouseDown: boolean
   rightMouseDown: boolean
+  gamepad?: GamepadInputState
+  lastGamepadUpdate: number
 }
 
 export interface Explosion extends Entity {
